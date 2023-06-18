@@ -340,6 +340,19 @@ struct Document {
         #endif
     }
 
+    void ResetBlink() {
+        sys->frame->bt.Start(BLINK_TIME);
+        if (redrawpending) return;
+        #ifndef SIMPLERENDER
+        wxClientDC dc(sw);
+        sw->DoPrepareDC(dc);
+        ShiftToCenter(dc);
+        DrawSelect(dc, selected, false, true);
+        blink = 1;
+        DrawSelect(dc, selected, true, true);
+        #endif
+    }
+
     void ResetCursor() {
         if (selected.g) selected.SetCursorEdit(this, selected.TextEdit());
     }
@@ -375,6 +388,7 @@ struct Document {
         isctrlshiftdrag = isctrlshift;
         DrawSelectMove(dc, selected);
         ResetCursor();
+        ResetBlink();
         return;
     }
 
