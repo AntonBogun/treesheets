@@ -6,6 +6,7 @@ struct MyFrame : wxFrame {
     wxToolBar *tb;
     int refreshhack, refreshhackinstances;
     BlinkTimer bt;
+    SelectionTimer seltimer;
     wxTaskBarIcon tbi;
     wxIcon icon;
     ImageDropdown *idd;
@@ -381,6 +382,12 @@ struct MyFrame : wxFrame {
                      _(L"Make a hierarchy layout more vertical (default) or more horizontal"));
 
             editmenu = new wxMenu();
+            MyAppend(editmenu, A_CUSTOM, _(L"Append ID"));
+            MyAppend(editmenu, A_CUSTOM2, _(L"Search ID"));
+            MyAppend(editmenu, A_CUSTOM3, _(L"Append Clip ID"));
+            MyAppend(editmenu, A_UNDOSELECT, _(L"Previous selection\tSHIFT+ALT+LEFT"));
+            MyAppend(editmenu, A_REDOSELECT, _(L"Next selection\tSHIFT+ALT+RIGHT"));
+            editmenu->AppendSeparator();
             MyAppend(editmenu, A_CUT, _(L"Cu&t\tCTRL+x"));
             MyAppend(editmenu, A_COPY, _(L"&Copy\tCTRL+c"));
             MyAppend(editmenu, A_COPYBM, _(L"&Copy as Bitmap\tCTRL+ALT+c"));
@@ -1211,17 +1218,17 @@ struct MyFrame : wxFrame {
                 if (p->doc->modified) {
                     nb->SetSelection(i);
                     if (p->doc->CheckForChanges()) {
-                        ce.Veto();
-                        return;
+                    ce.Veto();
+                    return;
                     }
                 }
             }
             // all files have been saved/discarded
             while (nb->GetPageCount()) {
                 GetCurTab()->doc->RemoveTmpFile();
-                nb->DeletePage(nb->GetSelection());
+                    nb->DeletePage(nb->GetSelection());
+                }
             }
-        }
         bt.Stop();
         sys->every_second_timer.Stop();
         Destroy();

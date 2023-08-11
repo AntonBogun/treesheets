@@ -68,6 +68,11 @@ class Selection {
         cursor = cursorend = 0;
         SetCursorEdit(doc, false);
     }
+    Selection GetSelectionUndo() const {
+        Selection new_sel = *this;
+        new_sel.textedit = false;
+        return new_sel;
+    }
 
     bool IsInside(Selection &o) {
         if (!o.g || !g) return false;
@@ -113,17 +118,48 @@ class Selection {
 
     int MaxCursor() { return int(GetCell()->text.t.Len()); }
 
-    inline bool IsWordSep(wxChar ch) {
-        // represents: !"#$%&'()*+,-./    :;<=>?@    [\]^    {|}~    `
-        return (32 < ch && ch < 48) || (57 < ch && ch < 65) || (90 < ch && ch < 95) || (122 < ch && ch < 127) || ch == 96;
-    }
 
-    inline int CharType(wxChar ch) {
-        if (wxIsspace(ch)) return TEXT_SPACE;
-        if (IsWordSep(ch)) return TEXT_SEP;
-        return TEXT_CHAR;
-    }
 
+    int MoveVerticalInCellText(int dy, int cursor, int maxcolwidth, Text& text) {
+        int i = 0;
+        int laststart, lastlen;
+        int nextoffset = -1;
+        for (int l = 0;; l++) {
+            int start = i;
+            wxString ls = text.GetLine(i, maxcolwidth);
+            int len = (int)ls.Len();
+            int end = start + len;
+
+            if (nextoffset >= 0) {
+                cursor = start + (nextoffset > len && len ? len : nextoffset);
+                break;
+            }
+
+            if (start <= cursor && cursor <= end) {
+                if (dy < 0) {
+                    if (l != 0) {
+                        cursor = laststart + (cursor - start > lastlen
+                            ? lastlen
+                            : cursor - start);
+                    }
+                    else {
+                        cursor = -1;
+                    }
+                    break;
+                }
+                else {
+                    nextoffset = cursor - start;
+                }
+            }
+
+            laststart = start;
+            lastlen = len;
+
+            if (!len) break;
+        }
+        return cursor;
+    }
+    
     void Dir(Document *doc, bool ctrl, bool shift, wxDC &dc, int dx, int dy, int &v, int &vs,
               int &ovs, bool notboundaryperp, bool notboundarypar, bool exitedit) {
         if (ctrl && !textedit) {
@@ -165,15 +201,34 @@ class Selection {
                     }
                 }
                 if (shift) {
-                    if (cursorend < cursor) swap_(cursorend, cursor);
+                    if (cursorend < cursor) 
+                    {
+                        firstdx *= -1;
+                        swap_(cursorend, cursor);
+                    }
                 } else
                     cursorend = cursor = curs;
             } else if (shift) {
                 if (textedit) {
-                    if (cursor == cursorend) firstdx = dx;
-                    (firstdx < 0 ? cursor : cursorend) += dx;
-                    if (cursor < 0) cursor = 0;
-                    if (cursorend > MaxCursor()) cursorend = MaxCursor();
+                    if (cursor == cursorend) firstdx = dx + dy; //going up is the same as going left
+                    if (dy) {
+                        int newcursor = (firstdx < 0 ? cursor : cursorend);
+                        Text& text = GetCell()->text;
+                        int maxcolwidth = GetCell()->parent->grid->colwidths[x];
+                        newcursor = MoveVerticalInCellText(dy, newcursor, maxcolwidth, text);
+                        newcursor = min(max(newcursor, 0), MaxCursor());
+                        (firstdx < 0 ? cursor : cursorend) = newcursor;
+                        if (cursorend < cursor)
+                        {
+                            firstdx *= -1;
+                            swap_(cursorend, cursor);
+                        }
+                    }
+                    else {
+                        (firstdx < 0 ? cursor : cursorend) += dx;
+                        if (cursor < 0) cursor = 0;
+                        if (cursorend > MaxCursor()) cursorend = MaxCursor();
+                    }
                 } else {
                     if (!xs) firstdx = 0;  // redundant: just in case someone else changed it
                     if (!ys) firstdy = 0;
@@ -210,45 +265,13 @@ class Selection {
                         bool intracell = true;
                         if (textedit && !exitedit && GetCell()) {
                             if (dy) {
-                                cursorend = cursor;
-                                Text &text = GetCell()->text;
+                                cursor = cursorend;
+                                Text& text = GetCell()->text;
                                 int maxcolwidth = GetCell()->parent->grid->colwidths[x];
-
-                                int i = 0;
-                                int laststart, lastlen;
-                                int nextoffset = -1;
-                                for (int l = 0;; l++) {
-                                    int start = i;
-                                    wxString ls = text.GetLine(i, maxcolwidth);
-                                    int len = (int)ls.Len();
-                                    int end = start + len;
-
-                                    if (len && nextoffset >= 0) {
-                                        cursor = cursorend =
-                                            start + (nextoffset > len ? len : nextoffset);
-                                        intracell = false;
-                                        break;
-                                    }
-
-                                    if (cursor >= start && cursor <= end) {
-                                        if (dy < 0) {
-                                            if (l != 0) {
-                                                cursor = cursorend =
-                                                    laststart + (cursor - start > lastlen
-                                                                     ? lastlen
-                                                                     : cursor - start);
-                                                intracell = false;
-                                            }
-                                            break;
-                                        } else {
-                                            nextoffset = cursor - start;
-                                        }
-                                    }
-
-                                    laststart = start;
-                                    lastlen = len;
-
-                                    if (!len) break;
+                                int newcursor = MoveVerticalInCellText(dy, cursor, maxcolwidth, text);
+                                if (0 <= newcursor && newcursor <= MaxCursor()) {
+                                    cursorend = cursor = newcursor;
+                                    intracell = false;
                                 }
                             } else {
                                 intracell = false;

@@ -312,6 +312,20 @@ struct Grid {
         }
         return best;
     }
+    // similar to FindLink, but searches for matching string ending with the given string
+    // will return the first match it finds
+    Cell* FindIDLink(wxString& id) {
+        foreachcell(c) {
+            Cell* find = c->FindIDLink(id);
+            if (find) return find;
+        }
+        return nullptr;
+    }
+    long FindMaxID() {
+        long id = 0;
+        foreachcell(c) id = max(id, c->FindMaxID());
+        return id;
+    }
 
     Cell *FindNextSearchMatch(wxString &search, Cell *best, Cell *selected, bool &lastwasselected) {
         foreachcell(c) best = c->FindNextSearchMatch(search, best, selected, lastwasselected);
@@ -440,6 +454,21 @@ struct Grid {
                 dc.DrawRectangle(g.x + g.width, g.y + g.height - 2, lw + 2, lw + 4);
                 dc.DrawRectangle(g.x + g.width - lw - 1, g.y + g.height - 2 + 2 * te, lw + 1,
                                  lw + 4 - 2 * te);
+                if (doc->selectblink) {
+                    int sw = g_sel_blink_width;
+                    if (g.width < 3 * sw || g.height < 3 * sw) {
+                        dc.DrawRectangle(g.x, g.y, g.width, g.height);
+                    } else {
+                        // Top border
+                        dc.DrawRectangle(g.x, g.y, g.width, sw);
+                        // Bottom border
+                        dc.DrawRectangle(g.x, g.y + g.height - sw, g.width, sw);
+                        // Left border
+                        dc.DrawRectangle(g.x, g.y + sw, sw, g.height - 2*sw);
+                        // Right border
+                        dc.DrawRectangle(g.x + g.width-sw, g.y + sw, sw, g.height - 2*sw);                        
+                    }
+                }
             }
             #ifndef SIMPLERENDER
             dc.SetLogicalFunction(wxXOR);

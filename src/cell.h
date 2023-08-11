@@ -455,6 +455,81 @@ struct Cell {
         }
         return best;
     }
+    // similar to FindLink, but searches for matching string ending with the given string
+    // will return the first match it finds
+    Cell* FindIDLink(wxString &id) {
+        Cell* find = nullptr;
+        if (text.t.EndsWith(id)) find = this;
+        if (!find && grid) find = grid->FindIDLink(id);
+        return find;
+    }
+    //equal to regex #T[0-9]\d*$
+    //TODO: need to reset search every time { is encountered
+    long FindMaxID() {
+        long l = text.t.Length();
+        long id = 0;
+        if (l >= 3) {
+            long i = l - 1;
+            while (i>= 2 && text.t[i].GetValue() >= 48 && text.t[i].GetValue()<58) {
+                --i;
+            }
+            // Check if the last number wasn't 0 and if the next two characters are '#' and 'T'
+            if (i >= 1 && i < l - 1 && text.t[i] == L'T' && text.t[i - 1] == L'#'  && text.t[i + 1] != L'0') {
+                if (!text.t.Mid(i + 1).ToLong(&id)) id = 0; //TODO: Long is actually int32, can change everything to use int
+            }
+        }
+        if (grid) id = max(id, grid->FindMaxID());
+        return id;
+    }
+    
+    //equal to searching for regex {#T.+?}
+    void NextLinkMatch(long curr, long &begin, long &end) {
+        begin = end = -1;
+        if (text.t.Length() < 4) return;
+        while (curr < text.t.Length()-4) {//min is >{#T1}, which is <-4
+            if (text.t[curr] == L'{' && text.t[curr + 1] == L'#' && text.t[curr+2] == L'T') {
+                begin = curr;
+                curr += 3;
+                while (curr < text.t.Length() && text.t[curr] != '}') ++curr;
+                if (curr < text.t.Length()) {
+                    end = curr;
+                }
+                else {
+                    begin = end = -1;
+                }
+                return;
+            }
+            ++curr;
+        }
+    }
+    
+    void FindClosestLink(long cursor, long& begin, long& end) {
+        begin = end = -1;
+        long lbegin, lend;//local
+        NextLinkMatch(0, lbegin, lend);
+        while (lbegin >= 0 && lend >= 0) {
+            if (lbegin <= cursor && lend >= cursor) {//within, best match
+                begin = lbegin;
+                end = lend;
+                return;
+            }
+            else if ((begin == -1 && end == -1) || (lend < cursor)) {//just found or on the left <=> closest so far
+                begin = lbegin;
+                end = lend;
+            }
+            else {
+                long currmin = min(abs(begin - cursor), abs(end - cursor));
+                long newmin = min(abs(lbegin - cursor), abs(lend - cursor));
+                if (newmin < currmin) {
+                    begin = lbegin;
+                    end = lend;
+                    return;
+                }
+            }
+            NextLinkMatch(lend + 1, lbegin, lend);
+        }
+    }
+
 
     void FindReplaceAll(const wxString &str, const wxString &lstr) {
         if (grid) grid->FindReplaceAll(str, lstr);

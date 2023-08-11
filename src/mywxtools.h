@@ -35,6 +35,26 @@ struct BlinkTimer : wxTimer {
     }
 };
 
+struct SelectionTimer : wxTimer {
+    int executionCount;
+    SelectionTimer() : executionCount(0) {}
+    void Notify() override {
+        if (executionCount >= 4) {
+            Stop(); // Stop the timer after 4 executions
+            return;
+        }
+        TSCanvas* tsc = sys->frame->GetCurTab();
+        //abuse the fact that 0=toggle, >0 = 1, <0 = 0
+        if (tsc) tsc->doc->SelectionBlink(executionCount>0 && executionCount<3 ? 0: 1-executionCount);
+        executionCount++;
+    }
+    void StartTimer() {
+        Stop();
+        executionCount = 0;
+        Start(200);
+    }
+};
+
 struct ThreeChoiceDialog : public wxDialog {
     ThreeChoiceDialog(wxWindow *parent, const wxString &title, const wxString &msg,
                       const wxString &ch1, const wxString &ch2, const wxString &ch3)

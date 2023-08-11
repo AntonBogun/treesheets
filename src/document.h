@@ -11,7 +11,10 @@ struct UndoItem {
 
     UndoItem() : estimated_size(0) {}
 };
-
+struct SelectItem {
+    Vector<Selection> path;
+    Selection sel;
+};
 struct Document {
     TSCanvas *sw;
     Cell *rootgrid;
@@ -23,6 +26,7 @@ struct Document {
     int initialzoomlevel;
     Cell *curdrawroot;  // for use during Render() calls
     Vector<UndoItem *> undolist, redolist;
+    Vector<SelectItem *> selecthist_undo, selecthist_redo;
     Vector<Selection> drawpath;
     int pathscalebias;
     wxString filename;
@@ -66,6 +70,7 @@ struct Document {
     uint printscale;
 
     bool blink;
+    bool selectblink;
 
     bool redrawpending;
     bool scrolltoselection;
@@ -111,6 +116,7 @@ struct Document {
           while_printing(false),
           printscale(0),
           blink(true),
+          selectblink(false),
           redrawpending(false),
           scrolltoselection(true),
           dpichanged(false),
@@ -347,6 +353,19 @@ struct Document {
         HandleBlink(true);
     }
 
+    
+    void SelectionBlink(int mode=0) {
+        if (redrawpending) return;
+        #ifndef SIMPLERENDER
+        wxClientDC dc(sw);
+        sw->DoPrepareDC(dc);
+        ShiftToCenter(dc);
+        DrawSelect(dc, selected, false);
+        selectblink = !mode ? !selectblink : mode>0;
+        DrawSelect(dc, selected, true);
+        #endif
+    }
+
     void ResetCursor() {
         if (selected.g) selected.SetCursorEdit(this, selected.TextEdit());
     }
@@ -367,7 +386,10 @@ struct Document {
         sys->UpdateStatus(hover);
     }
 
-    void SetSelect(const Selection &sel = Selection()) {
+    void SetSelect(const Selection &sel = Selection(), bool save_hist=true, bool blink=false) {
+        if (save_hist) {
+            AddSelectionUndo(sel);
+        }
         selected = sel;
         begindrag = sel;
     }
@@ -383,6 +405,7 @@ struct Document {
         DrawSelectMove(dc, selected);
         ResetCursor();
         ResetBlink();
+        if (isctrlshift & 0b1) sw->Status(Action(dc, A_CUSTOM2));
         return;
     }
 
@@ -1007,6 +1030,20 @@ struct Document {
                 } else {
                     return _(L"Nothing more to redo.");
                 }
+            case A_UNDOSELECT:
+                if (selecthist_undo.size()) {
+                    SelectUndo(dc, selecthist_undo, selecthist_redo);
+                    return nullptr;
+                } else {
+                    return _(L"No selection history to undo.");
+                }
+            case A_REDOSELECT:
+                if (selecthist_redo.size()) {
+                    SelectUndo(dc, selecthist_redo, selecthist_undo, true);
+                    return nullptr;
+                } else {
+                    return _(L"No selection history to redo.");
+                }
 
             case A_SAVE: return Save(false);
             case A_SAVEAS: return Save(true);
@@ -1396,7 +1433,7 @@ struct Document {
                 }
                 ZoomOutIfNoGrid(dc);
                 return nullptr;
-
+            
             case A_CUT:
             case A_COPY:
             case A_COPYCT:
@@ -1917,8 +1954,55 @@ struct Document {
                     k == A_LINK || k == A_LINKIMG,
                     k == A_LINKIMG || k == A_LINKIMGREV);
                 if (!link || !link->parent) return _(L"No matching cell found!");
-                SetSelect(link->parent->grid->FindCell(link));
+                SetSelect(link->parent->grid->FindCell(link), blink=true);
                 ScrollOrZoom(dc, true);
+                return nullptr;
+            }
+                          
+            case A_CUSTOM:
+            {
+                if (!c->parent) return nullptr;
+                c->AddUndo(this);
+                long maxid = rootgrid->FindMaxID();
+                maxid = max(maxid + 1, 0);//in case of overflow
+                wxString idappend = wxString::Format(L" #T%ld", maxid);
+                c->text.t.Append(idappend);
+                Refresh();
+                return nullptr;
+            }
+            case A_CUSTOM2:
+            {
+                long begin, end;
+                c->FindClosestLink(selected.TextEdit() ? selected.cursor : 0, begin, end);
+                if (end==-1){
+                    return _(L"No link ID found.");
+                }
+                wxString id = c->text.t.SubString(begin + 1, end - 1);//+1-1 since inclusive, but output includes {}
+                Cell* found = rootgrid->FindIDLink(id);
+                if (!found) return _(L"No matches for ID.");
+                SetSelect(found->parent->grid->FindCell(found));
+                sys->frame->seltimer.StartTimer();
+                ScrollOrZoom(dc, true);
+                return nullptr;
+            }
+            case A_CUSTOM3:
+            {
+                if (!c->parent) return nullptr;
+                c->AddUndo(this);
+                // extract id from clipboard
+                if (!wxTheClipboard->Open()) return _(L"Cannot open clipboard.");
+                if (!wxTheClipboard->IsSupported(wxDF_TEXT)) {
+                    wxTheClipboard->Close();
+                    return _(L"Clipboard does not contain text.");
+                }
+                wxTextDataObject data;
+                wxTheClipboard->GetData(data);
+                wxString id = data.GetText();
+                wxTheClipboard->Close();
+                // append
+                wxString idappend = wxString::Format(L" {%s}", id);
+                c->text.t.Append(idappend);
+                Refresh();
                 return nullptr;
             }
 
@@ -2021,6 +2105,7 @@ struct Document {
         if (!next) return _(L"No matches for search.");
         if (!jump) return nullptr;
         SetSelect(next->parent->grid->FindCell(next));
+        sys->frame->seltimer.StartTimer();
         if (focusmatch) sw->SetFocus();
         ScrollOrZoom(dc, true);
         return nullptr;
@@ -2212,7 +2297,7 @@ struct Document {
     }
 
     void Undo(wxDC &dc, Vector<UndoItem *> &fromlist, Vector<UndoItem *> &tolist,
-              bool redo = false) {
+        bool redo = false) {
         Selection beforesel = selected;
         Vector<Selection> beforepath;
         if (beforesel.g) CreatePath(beforesel.g->cell, beforepath);
@@ -2226,7 +2311,8 @@ struct Document {
         } else
             rootgrid = clone;
         clone->ResetLayout();
-        SetSelect(ui->sel);
+        SetSelect(ui->sel,false);
+        sys->frame->seltimer.StartTimer();
         if (selected.g) selected.g = WalkPath(ui->selpath)->grid;
         begindrag = selected;
         ui->sel = beforesel;
@@ -2241,6 +2327,87 @@ struct Document {
         else
             Refresh();
         UpdateFileName();
+    }
+
+    bool SelectItemsEqual(SelectItem* a, SelectItem* b) {
+        if (a->path.size() != b->path.size()) return false;
+        loopvrev(i, a->path) {
+            if (a->path[i].x != b->path[i].x || a->path[i].y != b->path[i].y) return false;
+        }
+        return a->sel.x == b->sel.x && a->sel.y == b->sel.y && a->sel.xs == b->sel.xs && a->sel.ys == b->sel.ys;
+    }
+    void AddSelectionUndo(const Selection& sel) {
+        if (!selected.g || !sel.g) return;
+        selecthist_redo.setsize(0);
+
+        SelectItem* si = new SelectItem();
+        si->sel = selected.GetSelectionUndo();
+        CreatePath(selected.g->cell, si->path);
+
+        SelectItem* new_si = new SelectItem();
+        new_si->sel = sel.GetSelectionUndo();
+        CreatePath(sel.g->cell, new_si->path);
+
+        if (!SelectItemsEqual(si, new_si)) {
+            selecthist_undo.push() = si;
+            if (selecthist_undo.size() > 1000) selecthist_undo.remove(0);
+        }
+    }
+    void SelectUndo(wxDC& dc, Vector<SelectItem*>& fromlist, Vector<SelectItem*>& tolist, bool redo = false) {
+        SelectItem *old_si = new SelectItem();
+        old_si->sel = selected.GetSelectionUndo();
+        if (selected.g) CreatePath(selected.g->cell, old_si->path);
+        SelectItem *si;
+        while (true) {
+            if (!fromlist.size()) {
+                si = nullptr;
+                break;
+            }
+            si = fromlist.pop();
+            Cell* c = rootgrid;
+            bool skip = false;
+            loopvrev(i, si->path) {
+                Selection& s = si->path[i];
+                Grid* g = c->grid;
+                if (!g || s.x >= g->xs || s.y >= g->ys) {
+                    tolist.push() = old_si;
+                    old_si = si;
+                    skip = true;
+                    break;
+                }
+                c = g->C(s.x, s.y);
+            }
+            if (skip) continue;
+            if (!si->sel.g) break;
+            Grid* g = c->grid;
+            if (!g) {
+                tolist.push() = old_si;
+                old_si = si;
+                continue;
+            }
+            si->sel.g = g;
+            si->sel.x = min(si->sel.x, g->xs);
+            si->sel.y = min(si->sel.y, g->ys);
+            si->sel.xs = min(si->sel.xs, g->xs - si->sel.x);
+            si->sel.ys = min(si->sel.ys, g->ys - si->sel.y);
+            if (!(si->sel.xs * si->sel.ys)) {
+                si->sel.xs = min(1, si->sel.xs);
+                si->sel.ys = min(1, si->sel.ys);
+            }
+            if ((!si->sel.xs) && (!si->sel.ys)) {
+                si->sel.y--;//assumes grid is not 0 height
+                si->sel.ys++;
+            }
+            break;
+        }
+        if (si) tolist.push() = old_si;
+        else si = old_si;
+        SetSelect(si->sel, false);
+        sys->frame->seltimer.StartTimer();
+        if (selected.g)
+            ScrollOrZoom(dc);
+        else
+            Refresh();
     }
 
     void ColorChange(int which, int idx) {

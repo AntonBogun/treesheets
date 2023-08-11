@@ -11,6 +11,7 @@ static const int g_grid_margin = 1;
 static const int g_cell_margin = 2;
 static const int g_margin_extra = 2;  // TODO, could make this configurable: 0/2/4/6
 static const int g_line_width = 1;
+static const int g_sel_blink_width = 15;
 static const int g_selmargin = 2;
 static const int g_scrollratecursor = 240;  // FIXME: must be configurable
 static const int g_scrollratewheel = 2;     // relative to 1 step on a fixed wheel usually being 120
@@ -251,6 +252,11 @@ enum {
     A_CUSTKEY,
     A_AUTOEXPORT,
     A_NOP,
+    A_CUSTOM,
+    A_CUSTOM2,
+    A_CUSTOM3,
+    A_UNDOSELECT,
+    A_REDOSELECT,
     A_TAGSET = 1000,  // and all values from here on
     A_SCRIPT = 2000,  // and all values from here on
     A_MAXACTION = 3000
@@ -276,6 +282,16 @@ enum {
     TEXT_SEP = 2,
     TEXT_CHAR = 1
 };
+inline bool IsWordSep(wxChar ch) {
+    // represents: !"#$%&'()*+,-./    :;<=>?@    [\]^    {|}~    `
+    return (32 < ch && ch < 48) || (57 < ch && ch < 65) || (90 < ch && ch < 95) || (122 < ch && ch < 127) || ch == 96;
+}
+
+inline int CharType(wxChar ch) {
+    if (wxIsspace(ch)) return TEXT_SPACE;
+    if (IsWordSep(ch)) return TEXT_SEP;
+    return TEXT_CHAR;
+}
 
 #include "script_interface.h"
 

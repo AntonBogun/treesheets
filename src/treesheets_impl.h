@@ -82,6 +82,13 @@ struct TreeSheetsScriptImpl : public ScriptInterface {
     void SetText(std::string_view t) {
         if (cur->parent) cur->text.t = wxString::FromUTF8(t.data(), t.size());
     }
+    
+    void LoadImage(std::string_view _fname) {
+        if (cur->parent) {
+            wxString fname = wxString::FromUTF8(_fname.data(), _fname.size());
+            doc->LoadImageIntoCell(fname, cur, sys->frame->csf);
+        }
+    }
 
     void CreateGrid(int x, int y) {
         if (x > 0 && y > 0 && x*y < max_new_grid_cells)

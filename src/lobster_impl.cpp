@@ -73,6 +73,10 @@ nfr("ts_set_text", "text", "S", "",
     "sets the text of the current cell.",
     [](StackPtr &sp, VM &, Value &s) { si->SetText(s.sval()->strv()); return Value(); });
 
+nfr("ts_load_image_from_file", "filename", "S", "",
+    "loads an image file and sets the image in the current cell.",
+    [](StackPtr& sp, VM&, Value& s) { si->LoadImage(s.sval()->strv()); return Value(); });
+
 nfr("ts_create_grid", "cols,rows", "II", "",
     "creates a grid in the current cell if there isn't one yet.",
     [](StackPtr &sp, VM &, Value &x, Value &y) {

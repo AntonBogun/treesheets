@@ -343,10 +343,10 @@ struct Text {
         }
     }
 
-    void ExpandToWord(Selection &s) {
-        if (!wxIsalnum(t[s.cursor])) return;
-        while (s.cursor > 0 && wxIsalnum(t[s.cursor - 1])) s.cursor--;
-        while (s.cursorend < (int)t.Len() && wxIsalnum(t[s.cursorend])) s.cursorend++;
+    void ExpandToWord(Selection& s) {
+        int initialType = CharType(t[s.cursor]);
+        while (s.cursor > 0 && CharType(t[s.cursor - 1]) == initialType) s.cursor--;
+        while (s.cursorend < (int)t.Len() && CharType(t[s.cursorend]) == initialType) s.cursorend++;
     }
 
     void SelectWord(Selection &s) {
