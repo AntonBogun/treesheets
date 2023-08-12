@@ -523,10 +523,59 @@ struct Cell {
                 if (newmin < currmin) {
                     begin = lbegin;
                     end = lend;
+                }
+                return;
+            }
+            NextLinkMatch(lend + 1, lbegin, lend);
+        }
+    }
+
+    void NextSubprocessMatch(long curr, long &begin, long &end) {
+        begin = end = -1;
+        long l = text.t.Length();
+        bool is_in=false;
+        while (curr < l-1) {
+            if (text.t[curr] == L'{' && text.t[curr + 1] == L'{') {
+                if (!is_in) {
+                    begin = curr;
+                    is_in = true;
+                }
+            } else if (text.t[curr] == L'}' && text.t[curr + 1] == L'}') {
+                if (is_in) {
+                    end = curr + 1;
                     return;
                 }
             }
-            NextLinkMatch(lend + 1, lbegin, lend);
+            ++curr;
+        }
+        begin = end = -1;
+    }
+
+    void FindClosestSubprocess(long cursor, long& begin, long& end) {
+        // subprocess text must be surrounded with {{}}
+        begin = end = -1;
+        long lbegin, lend;//local
+        NextSubprocessMatch(0, lbegin, lend);
+        while (lbegin >= 0 && lend >= 0) {
+            if (lbegin <= cursor && lend >= cursor) {//within, best match
+                begin = lbegin;
+                end = lend;
+                return;
+            }
+            else if ((begin == -1 && end == -1) || (lend < cursor)) {//just found or on the left <=> closest so far
+                begin = lbegin;
+                end = lend;
+            }
+            else {
+                long currmin = min(abs(begin - cursor), abs(end - cursor));
+                long newmin = min(abs(lbegin - cursor), abs(lend - cursor));
+                if (newmin < currmin) {
+                    begin = lbegin;
+                    end = lend;
+                }
+                return;
+            }
+            NextSubprocessMatch(lend + 1, lbegin, lend);
         }
     }
 

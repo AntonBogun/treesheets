@@ -405,10 +405,136 @@ struct Document {
         DrawSelectMove(dc, selected);
         ResetCursor();
         ResetBlink();
-        if (isctrlshift & 0b1) sw->Status(Action(dc, A_CUSTOM2));
+        //if (isctrlshift & 0b1) sw->Status(RunSubprocess({ "ahk" }).wc_str());
+        //if (isctrlshift & 0b1) sw->Status(Action(dc, A_CUSTOM2));
+
+        if (isctrlshift & 0b1) HandleCtrlClick(dc);
         return;
     }
+    //assumes cmdl is not null terminated
+    wxString RunSubprocess(vector<const char *> cmdl){
+        cmdl.push_back(nullptr);
+        std::string _stdout;
+        std::string _stderr;
+        struct subprocess_s subprocess;
+        int result = subprocess_create(cmdl.data(),
+            subprocess_option_inherit_environment
+            | subprocess_option_enable_async
+            | subprocess_option_no_window, &subprocess);
+        wxString msg;
+        if (result) {
+            msg=wxString::Format("subprocess_create failed: %d\n", result);
+        } else {
+            const unsigned int buflen = 256;
+            const char buf[buflen] = "";
+            auto read_async = [&](unsigned int (*subprocess_read)(subprocess_s*, char *const, const unsigned int), std::string& out) {
+                for (;;) {
+                    unsigned int readlength = subprocess_read(&subprocess, (char *const)buf, buflen);
+                    if (!readlength) break;
+                    out.append(buf, readlength);
+                }
+            };
+            read_async(subprocess_read_stdout,_stdout);
+            read_async(subprocess_read_stderr,_stderr);
+            int process_return;
+            result = subprocess_join(&subprocess, &process_return);
+            subprocess_destroy(&subprocess);
+            if (result) {
+                msg = wxString::Format("subprocess_join failed: %d\n", result);
+            }else{
+                msg = wxString::Format("return: %d; stdout: %s; stderr: %s\n", process_return, _stdout, _stderr);
+            }
+        }
+        msg.erase(std::remove(msg.begin(), msg.end(), '\n'), msg.end());
+        //format msg: "return: %d; stdout: %s; stderr: %s\n", process_return, stdout, stderr
+        // sw->Status(msg);
+        return msg;
+    }
+    void HandleCtrlClick(wxDC& dc) {
+        ShiftToCenter(dc);
+        if (!selected.g) 
+        {
+            sw->Status(NoSel());
+            return;
+        }
+        Cell* c = selected.GetCell();
+        if (!c)
+        {
+            sw->Status(OneCell());
+            return;
+        }
+        long begin, end;
+        long begin2, end2;
+        long _cursor = selected.TextEdit() ? selected.cursor : 0;
+        c->FindClosestLink(_cursor, begin, end);
+        c->FindClosestSubprocess(_cursor, begin2, end2);
+        long mindist = begin >= 0 && end >= 0 ? min(abs(begin - _cursor), abs(end - _cursor)) : LONG_MAX;
+        long mindist2 = begin2 >= 0 && end2 >= 0 ? min(abs(begin2 - _cursor), abs(end2 - _cursor)) : LONG_MAX;
+        if(mindist<=mindist2){
+            sw->Status(Action(dc, A_CUSTOM2));
+        }else if(mindist2!=LONG_MAX) {
+            auto _substr=c->text.t.SubString(begin2 + 2, end2 - 2);//get rid of {{}}
+            auto _args = SplitCommandLine(_substr);
+            sw->Status(RunSubprocess(ConvertToCStr(_args)));
+        }
+    }
 
+    std::vector<wxString> SplitCommandLine(const wxString& input) {
+        std::vector<wxString> args;
+        wxString currentArg;
+        bool inDoubleQuote = false;
+        bool inSingleQuote = false;
+        bool escapeNext = false;
+
+        for (wxChar ch : input) {
+            if (escapeNext) {
+                currentArg += ch;
+                escapeNext = false;
+                continue;
+            }
+            switch (ch) {
+            case '\\':
+                escapeNext = true;
+                break;
+            case '"':
+                if (!inSingleQuote) inDoubleQuote = !inDoubleQuote;
+                else currentArg += ch;
+                break;
+            case '\'':
+                if (!inDoubleQuote) inSingleQuote = !inSingleQuote;
+                else currentArg += ch;
+                break;
+            case ' ':
+            case '\t':
+                if (!inSingleQuote && !inDoubleQuote) {
+                    if (!currentArg.empty()) {
+                        args.push_back(currentArg);
+                        currentArg.clear();
+                    }
+                }
+                else {
+                    currentArg += ch;
+                }
+                break;
+            default:
+                currentArg += ch;
+                break;
+            }
+        }
+        if (!currentArg.empty()) {
+            args.push_back(currentArg);
+        }
+        return args;
+    }
+
+    std::vector<const char*> ConvertToCStr(const std::vector<wxString>& strings) {
+        std::vector<const char*> cstrs;
+        for (const auto& str : strings) {
+            cstrs.push_back(str.c_str());
+        }
+        return cstrs;
+    }
+    
     void SelectUp() {
         if (!isctrlshiftdrag || isctrlshiftdrag == 3 || begindrag.EqLoc(selected)) return;
         Cell *c = selected.GetCell();

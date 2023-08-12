@@ -294,6 +294,7 @@ inline int CharType(wxChar ch) {
 }
 
 #include "script_interface.h"
+#include "../lobster/include/subprocess.h"
 
 using namespace script;
 
