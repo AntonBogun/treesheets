@@ -58,6 +58,14 @@ struct TreeSheetsScriptImpl : public ScriptInterface {
                          : icoord(0, 0);
     }
 
+    icoord GetCurrentPos() {
+        if (cur->parent) {
+            Selection s=cur->parent->grid->FindCell(cur);
+            return icoord(s.x, s.y);
+        }
+        return icoord(0, 0);
+    }
+
     ibox SelectionBox() {
         auto &s = doc->selected;
         return s.g ? ibox(icoord(s.x, s.y), icoord(s.xs, s.ys))
@@ -90,6 +98,12 @@ struct TreeSheetsScriptImpl : public ScriptInterface {
         }
     }
 
+    void ClearImage() {
+        if (cur->parent) {
+            doc->ClearImageInCell(cur);
+        }
+    }
+
     void CreateGrid(int x, int y) {
         if (x > 0 && y > 0 && x*y < max_new_grid_cells)
             cur->AddGrid(x, y);
@@ -109,7 +123,7 @@ struct TreeSheetsScriptImpl : public ScriptInterface {
         if (cur->grid && x >= 0 && x + xs <= cur->grid->xs && y >= 0 && y + ys <= cur->grid->ys) {
             Selection s(cur->grid, x, y, xs, ys);
             cur->grid->MultiCellDeleteSub(doc, s);
-            doc->SetSelect(Selection());
+            doc->SetSelect(Selection()); 
             doc->Zoom(-100, *dc);
         }
     }

@@ -14,12 +14,14 @@ struct ScriptInterface {
     virtual void GoToParent() = 0;
     virtual int NumChildren() = 0;
     virtual icoord NumColumnsRows() = 0;
+    virtual icoord GetCurrentPos() = 0;
     virtual ibox SelectionBox() = 0;
     virtual void GoToChild(int n) = 0;
     virtual void GoToColumnRow(int x, int y) = 0;
     virtual std::string GetText() = 0;
     virtual void SetText(std::string_view t) = 0;
     virtual void LoadImage(std::string_view _fname) = 0;
+    virtual void ClearImage() = 0;
     virtual void CreateGrid(int x, int n) = 0;
     virtual void InsertColumn(int x) = 0;
     virtual void InsertRow(int y) = 0;

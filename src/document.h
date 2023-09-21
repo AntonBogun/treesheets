@@ -2561,6 +2561,10 @@ struct Document {
         c->Reset();
         return true;
     }
+    void ClearImageInCell(Cell *c) {
+        c->text.image = nullptr;
+        c->Reset();
+    }
 
     void ImageChange(wxString &fn, double sc) {
         if (!selected.g) return;

@@ -30,7 +30,7 @@ nfr("ts_goto_selection", "", "", "",
     [](StackPtr &sp, VM &) { si->GoToSelection(); return Value(); });
 
 nfr("ts_has_parent", "", "", "I",
-    "wether the current cell has a parent (is the root cell).",
+    "wether the current cell has a parent (is not the root cell).",
     [](StackPtr &sp, VM &) { return Value(si->HasParent()); });
 
 nfr("ts_goto_parent", "", "", "",
@@ -45,6 +45,10 @@ nfr("ts_num_children", "", "", "I",
 nfr("ts_num_columns_rows", "", "", "I}:2",
     "returns the number of columns & rows in the current cell.",
     [](StackPtr &sp, VM &vm) { PushVec(sp, int2(si->NumColumnsRows())); });
+
+nfr("ts_current_pos", "", "", "I}:2",
+    "returns the position of the current cell in the grid, (0,0) if root cell.",
+    [](StackPtr& sp, VM& vm) { PushVec(sp, int2(si->GetCurrentPos())); });
 
 nfr("ts_selection", "", "", "I}:2I}:2",
     "returns the (xs,ys) and (x,y) of the current selection, or zeroes if none.",
@@ -76,6 +80,9 @@ nfr("ts_set_text", "text", "S", "",
 nfr("ts_load_image_from_file", "filename", "S", "",
     "loads an image file and sets the image in the current cell.",
     [](StackPtr& sp, VM&, Value& s) { si->LoadImage(s.sval()->strv()); return Value(); });
+
+nfr("ts_clear_image_in_cell", "", "", "", "clears the image in the current cell.",
+    [](StackPtr &sp, VM &) { si->ClearImage(); return Value(); });
 
 nfr("ts_create_grid", "cols,rows", "II", "",
     "creates a grid in the current cell if there isn't one yet.",
