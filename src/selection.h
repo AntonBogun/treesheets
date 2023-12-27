@@ -267,11 +267,13 @@ class Selection {
                             if (dy) {
                                 cursor = cursorend;
                                 Text& text = GetCell()->text;
-                                int maxcolwidth = GetCell()->parent->grid->colwidths[x];
-                                int newcursor = MoveVerticalInCellText(dy, cursor, maxcolwidth, text);
-                                if (0 <= newcursor && newcursor <= MaxCursor()) {
-                                    cursorend = cursor = newcursor;
-                                    intracell = false;
+                                if (text.t.Len() != 0) {
+                                    int maxcolwidth = GetCell()->parent->grid->colwidths[x];
+                                    int newcursor = MoveVerticalInCellText(dy, cursor, maxcolwidth, text);
+                                    if (0 <= newcursor && newcursor <= MaxCursor()) {
+                                        cursorend = cursor = newcursor;
+                                        intracell = false;
+                                    }
                                 }
                             } else {
                                 intracell = false;
