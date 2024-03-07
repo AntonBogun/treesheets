@@ -81,6 +81,13 @@ nfr("ts_load_image_from_file", "filename", "S", "",
     "loads an image file and sets the image in the current cell.",
     [](StackPtr& sp, VM&, Value& s) { si->LoadImage(s.sval()->strv()); return Value(); });
 
+nfr("ts_save_image_to_file", "filename", "S", "",
+    "saves an image in the current cell to a file.",
+    [](StackPtr& sp, VM&, Value& s) { si->SaveImage(s.sval()->strv()); return Value(); });
+
+nfr("ts_has_image", "", "", "I", "returns true if there is an image in the current cell.",
+    [](StackPtr &sp, VM &) { return Value(si->HasImage());});
+
 nfr("ts_clear_image_in_cell", "", "", "", "clears the image in the current cell.",
     [](StackPtr &sp, VM &) { si->ClearImage(); return Value(); });
 

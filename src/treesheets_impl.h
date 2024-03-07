@@ -97,6 +97,21 @@ struct TreeSheetsScriptImpl : public ScriptInterface {
             doc->LoadImageIntoCell(fname, cur, sys->frame->csf);
         }
     }
+    void SaveImage(std::string_view _fname){//!uses current image format
+        if (cur->parent && ((bool) cur->text.image)){
+            wxString fname = wxString::FromUTF8(_fname.data(), _fname.size());
+            wxFFileOutputStream imagefile(fname,L"w+b");
+            if (imagefile.IsOk()) {
+                imagefile.Write(cur->text.image->image_data.data(), cur->text.image->image_data.size());
+            }
+        }
+    }
+    bool HasImage(){
+        if (cur->parent) {
+            return (bool) cur->text.image;
+        }
+        return false;
+    }
 
     void ClearImage() {
         if (cur->parent) {

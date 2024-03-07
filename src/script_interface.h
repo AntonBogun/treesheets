@@ -21,6 +21,8 @@ struct ScriptInterface {
     virtual std::string GetText() = 0;
     virtual void SetText(std::string_view t) = 0;
     virtual void LoadImage(std::string_view _fname) = 0;
+    virtual void SaveImage(std::string_view _fname) = 0;
+    virtual bool HasImage() = 0;
     virtual void ClearImage() = 0;
     virtual void CreateGrid(int x, int n) = 0;
     virtual void InsertColumn(int x) = 0;
