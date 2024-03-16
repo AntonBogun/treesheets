@@ -314,7 +314,7 @@ class Selection {
                     vs = 1;  // make it a cell selection
                 };
             }
-            doc->DrawSelectMove(dc, *this);
+            doc->DrawSelectMove(dc, *this, false, true, false);//!added refreshalways = false, refreshinstead = true
             doc->ResetBlink();
         };
     }

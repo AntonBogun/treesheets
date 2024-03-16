@@ -261,15 +261,15 @@ struct Document {
     }
 
     void DrawSelectMove(wxDC &dc, Selection &s, bool refreshalways = false,
-                        bool refreshinstead = true) {
-        if (ScrollIfSelectionOutOfView(dc, s)) return;
+                        bool refreshinstead = true, bool addpadding=true) {
+        if (ScrollIfSelectionOutOfView(dc, s, false,addpadding)) return;//!added refreshalways false
         if (refreshalways)
             RefreshReset();
         else
             DrawSelect(dc, s, refreshinstead);
     }
 
-    bool ScrollIfSelectionOutOfView(wxDC &dc, Selection &s, bool refreshalways = false) {
+    bool ScrollIfSelectionOutOfView(wxDC &dc, Selection &s, bool refreshalways = false,bool addpadding = true) {
         if (!scaledviewingmode) {
             // required, since sizes of things may have been reset by the last editing operation
             Layout(dc);
@@ -277,18 +277,38 @@ struct Document {
             sw->GetClientSize(&canvasw, &canvash);
             if ((layoutys > canvash || layoutxs > canvasw) && s.g) {
                 wxRect r = s.g->GetRect(this, s, true);
-                if (r.y < originy || r.y + r.height > maxy || r.x < originx ||
-                    r.x + r.width > maxx) {
+                if (r.y < originy || r.y + r.height > maxy || r.x < originx || r.x + r.width > maxx) {
                     int curx, cury;
-                    sw->GetViewStart(&curx, &cury);
-                    sw->SetScrollbars(1, 1, layoutxs, layoutys,
-                                      r.width > canvasw || r.x < originx
-                                          ? r.x
-                                          : r.x + r.width > maxx ? r.x + r.width - canvasw : curx,
-                                      r.height > canvash || r.y < originy
-                                          ? r.y
-                                          : r.y + r.height > maxy ? r.y + r.height - canvash : cury,
-                                      true);
+                    sw->GetViewStart(&curx, &cury); // Get current scroll positions
+                    int padx = 0; int pady = 0;
+                    if (addpadding) {
+                        padx = canvasw / 10;
+                        pady = canvash / 10;
+                    }
+                    // Determine new x position for scrolling
+                    int newx;
+                    if (r.width > canvasw || r.x < originx) {
+                        newx = r.x - padx;
+                    }
+                    else if (r.x + r.width > maxx) {
+                        newx = r.x + r.width - canvasw + padx;
+                    }
+                    else {
+                        newx = curx;
+                    }
+                    // Determine new y position for scrolling
+                    int newy;
+                    if (r.height > canvash || r.y < originy) {
+                        newy = r.y - pady;
+                    }
+                    else if (r.y + r.height > maxy) {
+                        newy = r.y + r.height - canvash + pady;
+                    }
+                    else {
+                        newy = cury;
+                    }
+                    // Set the new scroll position
+                    sw->SetScrollbars(1, 1, layoutxs, layoutys, newx, newy, true);
                     RefreshReset();
                     return true;
                 }
@@ -298,7 +318,7 @@ struct Document {
         return refreshalways;
     }
 
-    void ScrollOrZoom(wxDC &dc, bool zoomiftiny = false) {
+    void ScrollOrZoom(wxDC &dc, bool zoomiftiny = false, bool addpadding=true) {
         if (!selected.g) return;
         Cell *drawroot = WalkPath(drawpath);
         // If we jumped to a cell which may be insided a folded cell, we have to unfold it
@@ -320,7 +340,8 @@ struct Document {
             }
         Zoom(-100, dc, false, false);
         if (zoomiftiny) ZoomTiny(dc);
-        DrawSelectMove(dc, selected, true);
+
+        DrawSelectMove(dc, selected, true,true,addpadding);//!added refreshinstead=true
     }
 
     void ZoomTiny(wxDC &dc) {
@@ -386,7 +407,7 @@ struct Document {
         sys->UpdateStatus(hover);
     }
 
-    void SetSelect(const Selection &sel = Selection(), bool save_hist=true, bool blink=false) {
+    void SetSelect(const Selection &sel = Selection(), bool save_hist=true) {
         if (save_hist) {
             AddSelectionUndo(sel);
         }
@@ -402,7 +423,7 @@ struct Document {
         if (selected.GetCell() == hover.GetCell() && hover.GetCell()) hover.EnterEditOnly(this);
         SetSelect(hover);
         isctrlshiftdrag = isctrlshift;
-        DrawSelectMove(dc, selected);
+        DrawSelectMove(dc, selected,false,true,false);//!added refreshalways = false, refreshinstead = true
         ResetCursor();
         ResetBlink();
         //if (isctrlshift & 0b1) sw->Status(RunSubprocess({ "ahk" }).wc_str());
@@ -2080,7 +2101,8 @@ struct Document {
                     k == A_LINK || k == A_LINKIMG,
                     k == A_LINKIMG || k == A_LINKIMGREV);
                 if (!link || !link->parent) return _(L"No matching cell found!");
-                SetSelect(link->parent->grid->FindCell(link), blink=true);
+                SetSelect(link->parent->grid->FindCell(link));
+                sys->frame->seltimer.StartTimer();
                 ScrollOrZoom(dc, true);
                 return nullptr;
             }
@@ -2285,6 +2307,9 @@ struct Document {
             #endif
                 if (dataobji->GetBitmap().GetRefData() != wxNullBitmap.GetRefData()) {
                     c->AddUndo(this);
+                    //auto _dataobji = dataobji->GetBitmap();
+                    //_dataobji.UseAlpha();
+                    //wxImage im =_dataobji.ConvertToImage();
                     wxImage im = dataobji->GetBitmap().ConvertToImage();
                     vector<uint8_t> idv = ConvertWxImageToBuffer(im, wxBITMAP_TYPE_PNG);
                     SetImageBM(c, std::move(idv), sys->frame->csf);
