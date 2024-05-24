@@ -29,6 +29,7 @@ struct ScriptInterface {
     virtual void InsertRow(int y) = 0;
     virtual void Delete(int x, int y, int xs, int ys) = 0;
     virtual void SetBackgroundColor(uint32_t col) = 0;
+    virtual void SetDocumentBackgroundColor(uint32_t col) = 0;
     virtual void SetTextColor(uint32_t col) = 0;
     virtual void SetBorderColor(uint32_t col) = 0;
     virtual void SetRelativeSize(int s) = 0;

@@ -144,6 +144,7 @@ struct TreeSheetsScriptImpl : public ScriptInterface {
     }
 
     void SetBackgroundColor(uint col) { cur->cellcolor = col; }
+    void SetDocumentBackgroundColor(uint col) { doc->rootgrid->cellcolor = col; }
     void SetTextColor(uint col) { cur->textcolor = col; }
     void SetBorderColor(uint col) { if (cur->grid) cur->grid->bordercolor = col; }
     void SetRelativeSize(int s) { cur->text.relsize = s; }

@@ -16,6 +16,9 @@ struct SelectItem {
     Selection sel;
 };
 struct Document {
+    int lastedit_loc = 0;
+    Cell* lastedit_cell = nullptr;
+    wxChar lastedit_char = 0;
     TSCanvas *sw;
     Cell *rootgrid;
     Selection hover, selected, begindrag;
@@ -1142,7 +1145,17 @@ struct Document {
             Cell *c = selected.ThinExpand(this);
             if (!c) return OneCell();
             ShiftToCenter(dc);
-            c->AddUndo(this);  // FIXME: not needed for all keystrokes, or at least, merge all
+            //// FIXME: not needed for all keystrokes, or at least, merge all
+            //!FIXED
+            if ((uk == ' ' && lastedit_char!=' ') || c != lastedit_cell || selected.cursor != lastedit_loc+1) {
+                c->AddUndo(this);  
+            }
+            else {
+                c->ResetLayout();
+            }
+            lastedit_cell = c;
+            lastedit_loc = selected.cursor;
+            lastedit_char = uk;
                                // keystroke undos within same cell
             c->text.Key(this, uk, selected);
             ScrollIfSelectionOutOfView(dc, selected, true);
@@ -2422,7 +2435,7 @@ struct Document {
             modified = true;
             UpdateFileName();
         }
-        if (LastUndoSameCellTextEdit(c)) return;
+        //if (LastUndoSameCellTextEdit(c)) return; //!remove the hacky solution of coalescing
         UndoItem *ui = new UndoItem();
         undolist.push() = ui;
         ui->clone = c->Clone(nullptr);

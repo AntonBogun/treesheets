@@ -128,6 +128,13 @@ nfr("ts_set_background_color", "col", "F}:4", "",
         si->SetBackgroundColor(*(uint32_t *)quantizec(col, 0.0f).data());
     });
 
+nfr("ts_set_document_background_color", "col", "F}:4", "",
+    "sets the cell color of the current cell",
+    [](StackPtr& sp, VM& vm) {
+        auto col = PopVec<float3>(sp);
+        si->SetDocumentBackgroundColor(*(uint32_t*)quantizec(col, 0.0f).data());
+    });
+
 nfr("ts_set_text_color", "col", "F}:4", "",
     "sets the text color of the current cell",
     [](StackPtr &sp, VM &vm) {
